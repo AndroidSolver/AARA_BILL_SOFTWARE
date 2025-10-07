@@ -11,7 +11,7 @@ class BillingPage extends StatefulWidget {
 class _BillingPageState extends State<BillingPage> {
   List<Map<String, dynamic>> products = [];
   Map<int, int> selectedProducts = {}; // productId → quantity
-  Map<int, TextEditingController> qtyControllers = {}; // productId → quantity
+  Map<int, TextEditingController> qtyControllers = {};
 
   @override
   void initState() {
@@ -31,7 +31,7 @@ class _BillingPageState extends State<BillingPage> {
     setState(() {
       if (selectedProducts.containsKey(productId)) {
         selectedProducts.remove(productId);
-        qtyControllers.remove(productId); // also remove controller
+        qtyControllers.remove(productId);
       } else {
         selectedProducts[productId] = 1;
         qtyControllers[productId] = TextEditingController(text: "1");
@@ -48,6 +48,16 @@ class _BillingPageState extends State<BillingPage> {
         selectedProducts[productId] = qty;
       }
     });
+  }
+
+  Future<void> _saveInvoice() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            InvoicePage(products: products, selectedProducts: selectedProducts),
+      ),
+    );
   }
 
   Future<void> _showAddDialog({Product? product}) async {
@@ -77,43 +87,14 @@ class _BillingPageState extends State<BillingPage> {
         content: SingleChildScrollView(
           child: Column(
             children: [
-              TextField(
-                controller: categoryCtrl,
-                decoration: const InputDecoration(hintText: 'Category'),
-              ),
-              TextField(
-                controller: itemNoCtrl,
-                decoration: const InputDecoration(hintText: 'Item No'),
-              ),
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(hintText: 'Product Name'),
-              ),
-              TextField(
-                controller: qtyCtrl,
-                decoration: const InputDecoration(hintText: 'Quantity'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: priceCtrl,
-                decoration: const InputDecoration(hintText: 'Price'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: sgstCtrl,
-                decoration: const InputDecoration(hintText: 'SGST %'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: cgstCtrl,
-                decoration: const InputDecoration(hintText: 'CGST %'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: stockCtrl,
-                decoration: const InputDecoration(hintText: 'Stock'),
-                keyboardType: TextInputType.number,
-              ),
+              _buildTextField(categoryCtrl, 'Category'),
+              _buildTextField(itemNoCtrl, 'Item No'),
+              _buildTextField(nameCtrl, 'Product Name'),
+              _buildTextField(qtyCtrl, 'Quantity', isNumber: true),
+              _buildTextField(priceCtrl, 'Price', isNumber: true),
+              _buildTextField(sgstCtrl, 'SGST %', isNumber: true),
+              _buildTextField(cgstCtrl, 'CGST %', isNumber: true),
+              _buildTextField(stockCtrl, 'Stock', isNumber: true),
             ],
           ),
         ),
@@ -122,7 +103,7 @@ class _BillingPageState extends State<BillingPage> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () async {
               final newProduct = Product(
                 id: product?.id,
@@ -143,161 +124,184 @@ class _BillingPageState extends State<BillingPage> {
               if (mounted) Navigator.pop(context);
               _loadProducts();
             },
-            child: const Text('Save'),
+            icon: const Icon(Icons.save),
+            label: const Text('Save'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _saveInvoice() async {
-    /*final db = await DBHelper.db;
-
-    // calculate total
-    double total = 0;
-    for (final entry in selectedProducts.entries) {
-      final product = products.firstWhere((p) => p['id'] == entry.key);
-      total += (product['price'] as double) * entry.value;
-    }
-
-    // insert invoice
-    final invoiceId = await db.insert("invoices", {
-      "date": DateTime.now().toIso8601String(),
-      "total": total,
-    });
-
-    // insert invoice_items + update stock
-    for (final entry in selectedProducts.entries) {
-      final product = products.firstWhere((p) => p['id'] == entry.key);
-      final price = product['price'] as double;
-      final qty = entry.value;
-
-      await db.insert("invoice_items", {
-        "invoiceId": invoiceId,
-        "productId": entry.key,
-        "quantity": qty,
-        "price": price,
-      });
-
-      // reduce stock
-      final newStock = (product['stock'] as int) - qty;
-      await db.update(
-        "products",
-        {"stock": newStock},
-        where: "id = ?",
-        whereArgs: [entry.key],
-      );
-    } */
-
-    // ScaffoldMessenger.of(
-    //   context,
-    // ).showSnackBar(SnackBar(content: Text("Invoice #$invoiceId saved!")));
-
-    // _loadProducts(); // reload stock
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            InvoicePage(products: products, selectedProducts: selectedProducts),
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
+    bool isNumber = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: TextField(
+        controller: controller,
+        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       ),
     );
-
-    // Clear selection after save
-    // setState(() {
-    //   selectedProducts.clear();
-
-    // });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Billing")),
-      body: ListView(
-        children: products.map((p) {
-          final isSelected = selectedProducts.containsKey(p['id']);
-          final qty = selectedProducts[p['id']] ?? 0;
+      appBar: AppBar(
+        title: const Text("Billing"),
+        centerTitle: true,
+        backgroundColor: Colors.indigo,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(10),
+        child: products.isEmpty
+            ? const Center(
+                child: Text(
+                  "No products found. Please add a product.",
+                  style: TextStyle(fontSize: 16),
+                ),
+              )
+            : ListView.builder(
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final p = products[index];
+                  final isSelected = selectedProducts.containsKey(p['id']);
+                  final qty = selectedProducts[p['id']] ?? 1;
 
-          return ListTile(
-            title: Text("${p['name']} - ₹${p['price']} (Stock: ${p['stock']})"),
-            trailing: isSelected
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        onPressed: () => _changeQty(p['id'] as int, -1),
-                        icon: Icon(Icons.remove),
+                  return Card(
+                    elevation: 3,
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: isSelected ? Colors.indigo : Colors.transparent,
+                        width: 1.2,
                       ),
-                      // Text("$qty"),
-
-                      // Editable TextField for Quantity
-                      SizedBox(
-                        width: 50,
-                        child: TextField(
-                          controller: qtyControllers[p['id']],
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.all(6),
-                          ),
-                          onChanged: (value) {
-                            final newQty = int.tryParse(value) ?? 0;
-                            setState(() {
-                              if (newQty <= 0) {
-                                selectedProducts.remove(p['id']);
-                                qtyControllers.remove(p['id']);
-                              } else {
-                                selectedProducts[p['id']] = newQty;
-                              }
-                            });
-                          },
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      title: Text(
+                        p['name'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
                         ),
                       ),
-
-                      IconButton(
-                        onPressed: () => _changeQty(p['id'] as int, 1),
-                        icon: Icon(Icons.add),
+                      subtitle: Text(
+                        "₹${p['price']} | Stock: ${p['stock']}",
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
                       ),
-                    ],
-                  )
-                : IconButton(
-                    icon: Icon(Icons.add_shopping_cart),
-                    onPressed: () => _toggleProduct(p['id'] as int),
-                  ),
-          );
-        }).toList(),
+                      trailing: isSelected
+                          ? Container(
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.all(4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    onPressed: () =>
+                                        _changeQty(p['id'] as int, -1),
+                                    icon: const Icon(
+                                      Icons.remove,
+                                      color: Colors.indigo,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 40,
+                                    child: TextField(
+                                      controller: qtyControllers[p['id']],
+                                      textAlign: TextAlign.center,
+                                      decoration: const InputDecoration(
+                                        isDense: true,
+                                        border: InputBorder.none,
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                      onChanged: (val) {
+                                        final v = int.tryParse(val) ?? 0;
+                                        setState(() {
+                                          if (v > 0) {
+                                            selectedProducts[p['id']] = v;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () =>
+                                        _changeQty(p['id'] as int, 1),
+                                    icon: const Icon(
+                                      Icons.add,
+                                      color: Colors.indigo,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : IconButton(
+                              icon: const Icon(
+                                Icons.add_shopping_cart,
+                                color: Colors.indigo,
+                              ),
+                              onPressed: () => _toggleProduct(p['id'] as int),
+                            ),
+                    ),
+                  );
+                },
+              ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Row(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          FloatingActionButton.extended(
+          ElevatedButton.icon(
             onPressed: _showAddDialog,
-            label: Text("Add Product"),
-            icon: Icon(Icons.add),
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: const Text("Add Product"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18.0,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
           ),
-          SizedBox(width: 12), // spacing between FABs
-          FloatingActionButton.extended(
-            onPressed: _saveInvoice,
-            label: Text("Load Invoice"),
-            icon: Icon(Icons.upload),
+          const SizedBox(width: 16),
+          ElevatedButton.icon(
+            onPressed: selectedProducts.isEmpty ? null : _saveInvoice,
+            icon: const Icon(Icons.receipt_long, color: Colors.white),
+            label: const Text(
+              "Generate Invoice",
+              style: TextStyle(color: Colors.white),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18.0,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
           ),
         ],
       ),
     );
-  }
-
-  void _changeQtyDirect(int productId, int qty) {
-    setState(() {
-      if (qty <= 0) {
-        selectedProducts.remove(productId);
-      } else {
-        selectedProducts[productId] = qty;
-      }
-    });
   }
 
   @override
